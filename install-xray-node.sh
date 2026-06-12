@@ -134,6 +134,51 @@ check_env() {
 }
 
 # ============================================================================
+#  启用 BBR 加速
+# ============================================================================
+enable_bbr() {
+  title "启用 BBR 加速"
+
+  if [[ ! -f /proc/sys/net/ipv4/tcp_congestion_control ]]; then
+    warn "内核不支持 TCP 拥塞控制调整"
+    return 1
+  fi
+
+  local current
+  current=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "")
+  if [[ "$current" == "bbr" ]]; then
+    ok "BBR 已启用 (当前: $current)"
+    return 0
+  fi
+
+  info "当前拥塞控制: ${current:-未知}"
+
+  # 加载 tcp_bbr 模块
+  if ! lsmod 2>/dev/null | grep -q tcp_bbr; then
+    modprobe tcp_bbr 2>/dev/null || true
+  fi
+
+  # 写入配置使其永久生效
+  if ! grep -q "net.core.default_qdisc" /etc/sysctl.conf 2>/dev/null; then
+    echo "net.core.default_qdisc = fq" >> /etc/sysctl.conf
+  fi
+  if ! grep -q "net.ipv4.tcp_congestion_control" /etc/sysctl.conf 2>/dev/null; then
+    echo "net.ipv4.tcp_congestion_control = bbr" >> /etc/sysctl.conf
+  fi
+
+  sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1 || true
+  sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1 || true
+
+  local new_val
+  new_val=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "")
+  if [[ "$new_val" == "bbr" ]]; then
+    ok "BBR 加速已启用"
+  else
+    warn "BBR 启用失败，当前: $new_val"
+  fi
+}
+
+# ============================================================================
 #  获取 Xray 下载架构名
 # ============================================================================
 get_xray_arch() {
@@ -683,6 +728,7 @@ do_install() {
   local ver
   ver=$(get_latest_xray_version)
   check_env
+  enable_bbr
   install_xray "$ver"
   generate_xray_config
   setup_xray_service
@@ -832,6 +878,169 @@ do_uninstall() {
 }
 
 # ============================================================================
+#  hx 快捷命令 — 查看节点状态
+# ============================================================================
+do_hx() {
+  echo ""
+  echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+  echo -e "${MAG}          虎啸VPN 节点状态${RESET}"
+  echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+  echo ""
+
+  # Xray 状态
+  if systemctl is-active --quiet xray 2>/dev/null; then
+    echo -e "  ${GREEN}●${RESET} Xray:        运行中"
+  else
+    echo -e "  ${RED}●${RESET} Xray:        未运行"
+  fi
+
+  # 节点后端状态
+  if systemctl is-active --quiet huxiao-node 2>/dev/null; then
+    echo -e "  ${GREEN}●${RESET} 节点后端:    运行中 (端口 $NODE_BACKEND_PORT)"
+  else
+    echo -e "  ${RED}●${RESET} 节点后端:    未运行"
+  fi
+
+  # BBR 状态
+  local bbr_status
+  bbr_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "未知")
+  if [[ "$bbr_status" == "bbr" ]]; then
+    echo -e "  ${GREEN}●${RESET} BBR 加速:    已启用"
+  else
+    echo -e "  ${YELLOW}●${RESET} BBR 加速:    未启用 ($bbr_status)"
+  fi
+
+  # SSL 证书状态
+  if [[ -f /etc/ssl/huxiao/cert.pem ]]; then
+    local cert_expire
+    cert_expire=$(openssl x509 -enddate -noout -in /etc/ssl/huxiao/cert.pem 2>/dev/null | cut -d= -f2 || echo "未知")
+    echo -e "  ${GREEN}●${RESET} SSL 证书:    已安装 (到期: $cert_expire)"
+  else
+    echo -e "  ${YELLOW}●${RESET} SSL 证书:    未安装"
+  fi
+
+  # 节点信息
+  if [[ -f "$INSTALL_DIR/node-info.txt" ]]; then
+    local ip
+    ip=$(curl -s --connect-timeout 5 ifconfig.me 2>/dev/null || echo "获取IP失败")
+    echo ""
+    echo "  服务器 IP: $ip"
+    echo "  配置文件: $XRAY_DIR/config.json"
+    echo "  节点信息: $INSTALL_DIR/node-info.txt"
+  fi
+
+  echo ""
+  echo "  快捷操作:"
+  echo "    systemctl restart xray         重启 Xray"
+  echo "    systemctl restart huxiao-node  重启节点后端"
+  echo ""
+}
+
+# ============================================================================
+#  xray 命令 — 管理 Xray 服务
+# ============================================================================
+do_xray() {
+  local action="${1:-status}"
+
+  case "$action" in
+    start)
+      echo -e "${GREEN}启动 Xray 服务...${RESET}"
+      systemctl start xray
+      sleep 1
+      if systemctl is-active --quiet xray; then
+        echo -e "${GREEN}●${RESET} Xray 已启动"
+      else
+        echo -e "${RED}●${RESET} Xray 启动失败"
+        journalctl -u xray -n 10 --no-pager
+      fi
+      ;;
+    stop)
+      echo -e "${YELLOW}停止 Xray 服务...${RESET}"
+      systemctl stop xray
+      echo -e "${GREEN}●${RESET} Xray 已停止"
+      ;;
+    restart)
+      echo -e "${YELLOW}重启 Xray 服务...${RESET}"
+      systemctl restart xray
+      sleep 1
+      if systemctl is-active --quiet xray; then
+        echo -e "${GREEN}●${RESET} Xray 已重启"
+      else
+        echo -e "${RED}●${RESET} Xray 重启失败"
+        journalctl -u xray -n 10 --no-pager
+      fi
+      ;;
+    status)
+      echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+      echo -e "${MAG}          Xray 服务状态${RESET}"
+      echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+      echo ""
+      systemctl status xray --no-pager 2>/dev/null || echo "Xray 服务未安装"
+      echo ""
+      if [[ -f "$XRAY_DIR/config.json" ]]; then
+        echo "  配置文件: $XRAY_DIR/config.json"
+        local installed
+        installed=$(get_installed_xray_version)
+        echo "  Xray 版本: $installed"
+      else
+        echo -e "  ${YELLOW}未找到 Xray 配置，请先安装${RESET}"
+      fi
+      ;;
+    *)
+      echo "用法: bash install-xray-node.sh xray [start|stop|restart|status]"
+      echo ""
+      echo "  start   - 启动 Xray"
+      echo "  stop    - 停止 Xray"
+      echo "  restart - 重启 Xray"
+      echo "  status  - 查看状态（默认）"
+      ;;
+  esac
+}
+
+# ============================================================================
+#  addnode 命令 — 显示当前节点信息
+# ============================================================================
+do_addnode() {
+  echo ""
+  echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+  echo -e "${MAG}          虎啸VPN 节点信息${RESET}"
+  echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+  echo ""
+
+  if [[ ! -f "$INSTALL_DIR/node-info.txt" ]]; then
+    echo -e "  ${YELLOW}未找到节点信息，请先安装节点${RESET}"
+    echo ""
+    return 1
+  fi
+
+  local ip uuid pubkey short_id secret
+  ip=$(curl -s --connect-timeout 5 ifconfig.me 2>/dev/null || echo "获取IP失败")
+
+  # 从 node-info.txt 提取信息
+  uuid=$(grep "UUID:" "$INSTALL_DIR/node-info.txt" 2>/dev/null | awk '{print $NF}' || echo "")
+  pubkey=$(grep "PublicKey:" "$INSTALL_DIR/node-info.txt" 2>/dev/null | awk '{print $NF}' || echo "")
+  short_id=$(grep "ShortId:" "$INSTALL_DIR/node-info.txt" 2>/dev/null | awk '{print $NF}' || echo "")
+  secret=$(grep "节点密钥:" "$INSTALL_DIR/node-info.txt" 2>/dev/null | awk '{print $NF}' || echo "")
+
+  echo "  ┌─────────────────────────────────────────────┐"
+  echo "  │             节点连接信息                      │"
+  echo "  ├─────────────────────────────────────────────┤"
+  echo "  │  地址:        $ip"
+  echo "  │  端口:        443"
+  echo "  │  协议:        VLESS + XTLS-Vision + REALITY"
+  echo "  │  UUID:        $uuid"
+  echo "  │  PublicKey:   $pubkey"
+  echo "  │  ShortId:     $short_id"
+  echo "  │  回落域名:    $FALLBACK_DOMAIN"
+  echo "  │  节点后端:    :$NODE_BACKEND_PORT"
+  echo "  │  节点密钥:    $secret"
+  echo "  └─────────────────────────────────────────────┘"
+  echo ""
+  echo "  安装时间: $(grep "生成时间:" "$INSTALL_DIR/node-info.txt" 2>/dev/null | sed 's/.*生成时间: //' || echo "未知")"
+  echo ""
+}
+
+# ============================================================================
 #  主菜单
 # ============================================================================
 show_menu() {
@@ -882,6 +1091,20 @@ show_menu() {
 }
 
 # ============================================================================
-#  启动入口
+#  启动入口（支持 hx / xray 参数快速操作）
 # ============================================================================
+  case "${1:-}" in
+  hx)
+    do_hx
+    exit 0
+    ;;
+  xray)
+    do_xray "${2:-status}"
+    exit 0
+    ;;
+  addnode)
+    do_addnode
+    exit 0
+    ;;
+esac
 show_menu
