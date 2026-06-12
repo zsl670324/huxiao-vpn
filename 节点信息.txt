@@ -5,7 +5,7 @@
   ┌─────────────────────────────────────────────┐
   │             节点连接信息                      │
   ├─────────────────────────────────────────────┤
-  │  地址:        146.56.142.151
+  │  地址:        1.2.3.4
   │  端口:        443
   │  协议:        VLESS + XTLS-Vision + REALITY
   │  UUID:        d2eceae2-8b17-4c47-83c4-d88b48165c05
@@ -13,7 +13,7 @@
   │  ShortId:     f0aca1a2
   │  回落域名:    www.cloudflare.com
   │  节点后端:    :9080
-  │  节点密钥:    f83afb907802406ba11bab57cb060f5e08f453d20e6c4752
+  │  节点密钥:    xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
   └─────────────────────────────────────────────┘
 
   服务管理命令:
@@ -23,12 +23,11 @@
     systemctl restart huxiao-node 重启节点后端
     systemctl status acme-renewal.timer  查看 SSL 续期状态
 
-  节点后端 API: http://146.56.142.151:9080/api/node/health
+  节点后端 API: http://1.2.3.4:9080/api/node/health
 
   在主后端 ServerConfig 中添加此节点:
-    nodeBackendUrl: http://146.56.142.151:9080
+    nodeBackendUrl: http://1.2.3.4:9080
     useXrayNode: true
-    nodeSecret: f83afb907802406ba11bab57cb060f5e08f453d20e6c4752
-
+    nodeSecret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 [信息] 节点信息已保存: /opt/huxiao-node/node-info.txt
 
