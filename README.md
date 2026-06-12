@@ -13,8 +13,7 @@
 ## 📦 包含内容
 
 ### 安装脚本
-- `install-backend.sh` - 后端服务器安装脚本 (v3.1)
-- `install-backend-fixed.sh` - 后端服务器安装脚本 (修复版 v3.2)
+- `install-backend.sh` - 后端服务器安装脚本 (v3.2)
 - `install-xray-node.sh` - Xray节点安装脚本
 - `update-node.sh` - 节点更新脚本
 
@@ -35,7 +34,6 @@
 # 下载脚本
 wget -O install-backend.sh https://raw.githubusercontent.com/yourusername/huxiao-vpn/vpn/install-backend.sh
 wget -O install-xray-node.sh https://raw.githubusercontent.com/yourusername/huxiao-vpn/vpn/install-xray-node.sh
-wget -O install-backend-fixed.sh https://raw.githubusercontent.com/yourusername/huxiao-vpn/vpn/install-backend-fixed.sh
 ```
 
 ### 2. 安装后端服务器
@@ -44,10 +42,7 @@ wget -O install-backend-fixed.sh https://raw.githubusercontent.com/yourusername/
 # 给脚本执行权限
 chmod +x install-backend.sh install-backend-fixed.sh install-xray-node.sh
 
-# 安装后端服务器 (推荐使用修复版)
-sudo bash install-backend-fixed.sh
-
-# 或使用原版
+# 安装后端服务器 
 sudo bash install-backend.sh
 ```
 
@@ -101,8 +96,7 @@ sudo bash update-node.sh
 ```
 huxiao-vpn/
 ├── README.md                    # 项目说明
-├── install-backend.sh            # 后端安装脚本 (v3.1)
-├── install-backend-fixed.sh     # 后端安装脚本 (修复版 v3.2)
+├── install-backend.sh            # 后端安装脚本 (v3.2)
 ├── install-xray-node.sh         # Xray节点安装脚本
 ├── update-node.sh               # 节点更新脚本
 ├── notification-server-1.3.6.jar # 后端服务器程序
@@ -140,8 +134,7 @@ huxiao-vpn/
 
 ## 🔄 版本历史
 
-- **v3.2** (修复版): 修复所有已知BUG，增强安全性和兼容性
-- **v3.1**: 原始版本，功能完整但存在一些兼容性问题
+- **v3.2**: 原始版本，功能完整但存在一些兼容性问题
 
 ## 🤝 贡献
 
