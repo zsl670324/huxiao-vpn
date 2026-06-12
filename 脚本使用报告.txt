@@ -1,0 +1,250 @@
+══════════════════════════════════════════════════════════════
+    虎啸VPN 部署脚本使用报告 v2.1
+    更新时间: 2026-06-10
+══════════════════════════════════════════════════════════════
+
+目录总览
+─────────────────────────────────────────────────────────────
+D:\huxiao-vpn-node\
+├── install-backend.sh              45 KB   后端全新安装脚本 v3.1
+├── install-xray-node.sh            32 KB   节点服务器安装脚本
+├── update-node.sh                   2 KB   节点JAR快速更新脚本
+├── notification-server-1.3.6.jar   52.7 MB 后端主服务JAR包
+├── node-backend-1.1.3.jar          18.8 MB 节点后端JAR包
+├── huxiao-vpn-backend-full-backup-20260610171857.tar.gz  47.4 MB 完整备份包
+├── 脚本使用报告.txt                 本文件
+└── 节点信息.txt                     9 KB   已安装节点的连接信息
+
+══════════════════════════════════════════════════════════════
+一、install-backend.sh v3.1 — 后端全新安装脚本
+══════════════════════════════════════════════════════════════
+
+功能概述:
+    不依赖备份包的纯全新安装脚本。仅需 notification-server-*.jar 文件，
+    即可在全新 Ubuntu/Debian 服务器上一键部署后端服务。
+
+运行模式:
+    sudo bash install-backend.sh              全新安装（默认）
+    sudo bash install-backend.sh --ssl        SSL证书管理
+    sudo bash install-backend.sh --domain     域名替换
+    sudo bash install-backend.sh --backup     备份当前环境
+    sudo bash install-backend.sh --cert-info  查看证书信息
+
+全新安装流程（8步）:
+    [1/8] 安装系统依赖     Java 17 + MySQL/MariaDB 自动安装
+    [2/8] 收集安装参数     数据库/管理员/密钥/SSL 全部可自定义或随机
+    [3/8] 部署后端文件     JAR + 符号链接
+    [4/8] 生成配置文件     application.yml + env.conf
+    [5/8] 配置SSL证书      Let's Encrypt / 自签名 / 仅HTTP
+    [6/8] 初始化MySQL      建库建表（8张表），管理员由DataInitializer自动创建
+    [7/8] 安装systemd服务  开机自启 + 防火墙端口
+    [8/8] 启动服务验证     健康检查 + 生成安装报告
+
+支持自定义的参数:
+    ┌─────────────────┬──────────────────────────────────────┐
+    │ 参数            │ 说明                                  │
+    ├─────────────────┼──────────────────────────────────────┤
+    │ 数据库用户名/密码│ MySQL连接凭据                         │
+    │ 管理员账号/密码  │ 后台登录，DataInitializer自动BCrypt编码 │
+    │ APP_SECRET      │ API签名密钥，随机32位hex               │
+    │ AES_KEY         │ 加密密钥，随机Base64                   │
+    │ JWT_SECRET      │ JWT令牌密钥，随机64位hex               │
+    │ NODE_SECRET     │ 节点通信密钥，随机32位hex               │
+    │ SSL模式         │ Let's Encrypt(需域名) / 自签名 / HTTP  │
+    │ Keystore密码    │ PKCS12密钥库密码                       │
+    └─────────────────┴──────────────────────────────────────┘
+
+v3.1 修复的问题:
+    1. 移除 set -e，避免非致命错误中断脚本
+    2. JAR文件自动检测，不再硬编码版本号
+    3. MySQL root连接方式逐个独立测试
+    4. 健康检查URL修正: https://localhost/
+    5. acme.sh 路径检测: command -v + ~/.acme.sh/acme.sh
+    6. SQL使用临时文件执行，避免heredoc问题
+    7. env.conf变量名与application.yml占位符一致
+
+依赖:
+    - Ubuntu/Debian (推荐) 或 CentOS/Rocky
+    - notification-server-*.jar（任意版本，自动检测）
+    - root 或 sudo 权限
+
+══════════════════════════════════════════════════════════════
+二、install-xray-node.sh — 节点服务器安装脚本
+══════════════════════════════════════════════════════════════
+
+功能概述:
+    在独立服务器上安装 Xray-core + 节点后端，支持 VLESS+XTLS-Vision+REALITY 协议。
+    包含SSL证书自动申请、systemd服务注册、节点密钥生成。
+
+运行方式:
+    sudo bash install-xray-node.sh
+
+安装流程:
+    [1] 系统检测        自动检测OS/架构(amd64/arm64)
+    [2] 安装Xray-core   下载官方二进制 + REALITY密钥对生成
+    [3] 生成Xray配置    VLESS+XTLS-Vision+REALITY协议配置
+    [4] SSL证书          acme.sh申请Let's Encrypt证书
+    [5] 节点后端         node-backend JAR部署 + 配置生成
+    [6] systemd服务      xray + huxiao-node 两个服务
+    [7] 启动验证         健康检查 + 节点信息输出
+
+节点后端端口: 9080
+节点协议:     VLESS + XTLS-Vision + REALITY
+节点密钥:     由脚本生成UUID/PublicKey/ShortId/NodeSecret
+
+已部署节点（节点信息.txt记录）:
+    ┌──────────────────────────────────────────────────────┐
+    │ 节点      IP               回落域名                  │
+    ├──────────────────────────────────────────────────────┤
+    │ 新加坡     146.56.142.151   www.microsoft.com        │
+    │ 香港       2406:da10:8dfe   www.microsoft.com        │
+    │ 东京       119.28.100.128   www.microsoft.com        │
+    │ 首尔       8.219.255.227    www.cloudflare.com       │
+    │ 法兰克福   43.203.180.51    www.cloudflare.com       │
+    └──────────────────────────────────────────────────────┘
+    公共节点密钥: f83afb907802406ba11bab57cb060f5e08f453d20e6c4752
+
+在主后端添加节点:
+    登录管理后台 → 服务器节点配置 → 添加节点
+    填入: nodeBackendUrl, useXrayNode=true, nodeSecret
+
+══════════════════════════════════════════════════════════════
+三、update-node.sh — 节点JAR快速更新
+══════════════════════════════════════════════════════════════
+
+功能概述:
+    快速更新节点后端JAR文件。查找本地JAR → 停止服务 → 备份 → 替换 → 重启。
+
+运行方式:
+    sudo bash update-node.sh
+
+JAR搜索路径（按优先级）:
+    1. 脚本同目录
+    2. /home/ubuntu/
+    3. /root/
+
+执行流程:
+    [1/6] 查找JAR
+    [2/6] 停止 huxiao-node 服务
+    [3/6] 备份旧JAR到 /opt/huxiao-node/backup/
+    [4/6] 部署新JAR
+    [5/6] 重启服务
+    [6/6] 健康检查验证
+
+══════════════════════════════════════════════════════════════
+四、JAR包说明
+══════════════════════════════════════════════════════════════
+
+notification-server-1.3.6.jar  (52.7 MB)
+    后端主服务，提供:
+    - 管理后台 Web面板 (/admin)
+    - REST API (用户管理/激活码/服务器配置)
+    - JWT认证 + API签名验证
+    - 数据库: notification_db (MySQL)
+    - 端口: 443(HTTPS) / 8082(HTTP管理面板)
+    - SSL: PKCS12 keystore.p12
+
+node-backend-1.1.3.jar  (18.8 MB)
+    节点后端，提供:
+    - 节点健康检查 (/api/node/health)
+    - 流量统计上报
+    - 用户数据同步
+    - 端口: 9080
+    - 无数据库，通过NODE_SECRET与主后端通信
+
+══════════════════════════════════════════════════════════════
+五、备份包说明
+══════════════════════════════════════════════════════════════
+
+huxiao-vpn-backend-full-backup-20260610171857.tar.gz  (47.4 MB)
+    来源: 52.77.240.2 主后端服务器 (2026-06-10)
+    内容:
+    ├── notification-server/notification-server-1.3.6.jar
+    ├── notification-server/application.yml
+    ├── notification-server/env.conf
+    ├── notification-server/keystore.p12
+    └── notification_db.sql
+
+    ⚠️  此备份包用于恢复，新服务器安装使用 install-backend.sh
+
+══════════════════════════════════════════════════════════════
+六、典型工作流程
+══════════════════════════════════════════════════════════════
+
+场景A: 新服务器部署后端
+    1. 上传 install-backend.sh + notification-server-1.3.6.jar 到服务器
+    2. sudo bash install-backend.sh
+    3. 按提示输入参数（数据库/管理员/SSL）
+    4. 等待安装完成，获取管理员账号密码
+
+场景B: 从备份恢复
+    1. 上传完整备份包 + install-backend.sh 到服务器
+    2. sudo bash install-backend.sh
+    3. 脚本自动解压备份、恢复数据库、部署JAR
+
+场景C: 更换域名
+    1. sudo bash install-backend.sh --domain
+    2. 输入新域名和邮箱
+    3. 自动: 更新配置 → 申请证书 → 生成keystore → 重启服务
+
+场景D: SSL证书管理
+    1. sudo bash install-backend.sh --ssl
+    2. 选择: 查看证书 / 申请Let's Encrypt / 生成Keystore
+    3. 重启服务使证书生效
+
+场景E: 部署新节点
+    1. 上传 install-xray-node.sh + node-backend-1.1.3.jar 到节点服务器
+    2. sudo bash install-xray-node.sh
+    3. 获取节点连接信息
+    4. 在主后端管理后台添加节点配置
+
+场景F: 更新节点JAR
+    1. 上传 node-backend-1.1.3.jar + update-node.sh 到节点服务器
+    2. sudo bash update-node.sh
+    3. 自动备份旧版、替换、重启、验证
+
+══════════════════════════════════════════════════════════════
+七、运维命令速查
+══════════════════════════════════════════════════════════════
+
+服务管理:
+    systemctl status notification-server    后端状态
+    systemctl restart notification-server   重启后端
+    systemctl status huxiao-node            节点后端状态
+    systemctl restart huxiao-node           重启节点后端
+    systemctl status xray                   Xray状态
+
+日志查看:
+    journalctl -u notification-server -f    实时后端日志
+    journalctl -u huxiao-node -f            实时节点日志
+    journalctl -u notification-server -n 100 最近100行
+
+数据库:
+    mysql -u admin -p notification_db       登录数据库
+    mysql -u admin -p notification_db -e "SELECT COUNT(*) FROM vpn_users;"
+
+SSL证书:
+    ~/.acme.sh/acme.sh --list              查看已申请的证书
+    ~/.acme.sh/acme.sh --renew -d 域名     手动续期
+    openssl x509 -in /etc/letsencrypt/live/域名/cert.pem -noout -dates
+
+防火墙:
+    ufw status                              查看防火墙规则
+    ufw allow 443/tcp                       开放443端口
+
+══════════════════════════════════════════════════════════════
+八、安全注意事项
+══════════════════════════════════════════════════════════════
+
+1. env.conf 包含数据库密码和所有密钥，权限已设为600（仅root可读）
+2. 安装完成后请立即修改管理后台默认密码
+3. 不要将 env.conf 或备份包上传到公开仓库
+4. 定期执行 --backup 备份数据库和配置
+5. SSL证书通过 acme.sh 自动续期（已配置crontab）
+
+══════════════════════════════════════════════════════════════
+版本历史
+══════════════════════════════════════════════════════════════
+v2.1  (2026-06-10)  install-backend.sh 升级到 v3.1，修复13个问题
+v2.0  (2026-06-10)  install-backend.sh 重写为 v3.0，支持多模式
+v1.0  (2026-06-10)  初始版本

@@ -1,0 +1,34 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ 虎啸VPN 节点服务器安装完成！
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ┌─────────────────────────────────────────────┐
+  │             节点连接信息                      │
+  ├─────────────────────────────────────────────┤
+  │  地址:        146.56.142.151
+  │  端口:        443
+  │  协议:        VLESS + XTLS-Vision + REALITY
+  │  UUID:        d2eceae2-8b17-4c47-83c4-d88b48165c05
+  │  PublicKey:   veTb0odwj4FqDgCKyPzNjiLRalP82-vFRs1_52xTkUA
+  │  ShortId:     f0aca1a2
+  │  回落域名:    www.cloudflare.com
+  │  节点后端:    :9080
+  │  节点密钥:    f83afb907802406ba11bab57cb060f5e08f453d20e6c4752
+  └─────────────────────────────────────────────┘
+
+  服务管理命令:
+    systemctl status xray         查看 Xray 状态
+    systemctl restart xray        重启 Xray
+    systemctl status huxiao-node  查看节点后端状态
+    systemctl restart huxiao-node 重启节点后端
+    systemctl status acme-renewal.timer  查看 SSL 续期状态
+
+  节点后端 API: http://146.56.142.151:9080/api/node/health
+
+  在主后端 ServerConfig 中添加此节点:
+    nodeBackendUrl: http://146.56.142.151:9080
+    useXrayNode: true
+    nodeSecret: f83afb907802406ba11bab57cb060f5e08f453d20e6c4752
+
+[信息] 节点信息已保存: /opt/huxiao-node/node-info.txt
+
