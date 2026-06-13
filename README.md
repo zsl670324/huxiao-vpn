@@ -32,15 +32,15 @@
 
 ```bash
 # 下载脚本
-wget -O install-backend.sh https://raw.githubusercontent.com/yourusername/huxiao-vpn/vpn/install-backend.sh
-wget -O install-xray-node.sh https://raw.githubusercontent.com/yourusername/huxiao-vpn/vpn/install-xray-node.sh
+wget -O install-backend.sh https://raw.githubusercontent.com/zsl670324/huxiao-vpn/vpn/install-backend.sh
+wget -O install-xray-node.sh https://raw.githubusercontent.com/zsl670324/huxiao-vpn/vpn/install-xray-node.sh
 ```
 
 ### 2. 安装后端服务器
 
 ```bash
 # 给脚本执行权限
-chmod +x install-backend.sh install-backend-fixed.sh install-xray-node.sh
+chmod +x install-xray-node.sh
 
 # 安装后端服务器 
 sudo bash install-backend.sh
