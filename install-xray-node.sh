@@ -9,6 +9,7 @@
 set -e
 
 # -------------------- 配置区（可修改）---------------------------------------
+XRAY_PORT=443                         # Xray VLESS 端口（REALITY 协议）
 NODE_BACKEND_PORT=9080                # 节点后端端口
 INSTALL_DIR="/opt/huxiao-node"        # 节点后端安装目录
 XRAY_DIR="/usr/local/etc/xray"        # Xray 配置目录
@@ -121,7 +122,7 @@ check_env() {
   fi
   ok "依赖检查完成"
 
-  for port in 443 80 "$NODE_BACKEND_PORT"; do
+  for port in ${XRAY_PORT} 80 "$NODE_BACKEND_PORT"; do
     if ss -tlnp 2>/dev/null | grep -q ":$port "; then
       local proc; proc=$(ss -tlnp 2>/dev/null | grep ":$port " | head -1)
       warn "端口 $port 已被占用: $proc"
@@ -275,7 +276,7 @@ generate_xray_config() {
   },
   "inbounds": [
     {
-      "port": 443,
+      "port": ${XRAY_PORT},
       "protocol": "vless",
       "tag": "vless-inbound",
       "settings": {
@@ -617,19 +618,19 @@ setup_firewall() {
   title "7/8  配置防火墙"
 
   if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
-    ufw allow 443/tcp   comment "Xray VLESS+REALITY" 2>/dev/null || true
+    ufw allow ${XRAY_PORT}/tcp   comment "Xray VLESS+REALITY" 2>/dev/null || true
     ufw allow 80/tcp    comment "HTTP (SSL verify)" 2>/dev/null || true
     ufw allow "$NODE_BACKEND_PORT"/tcp comment "Huxiao Node Backend" 2>/dev/null || true
     ok "UFW 防火墙规则已添加"
   elif command -v firewall-cmd &>/dev/null; then
-    for p in 443 80 "$NODE_BACKEND_PORT"; do
+    for p in ${XRAY_PORT} 80 "$NODE_BACKEND_PORT"; do
       firewall-cmd --permanent --add-port="$p"/tcp 2>/dev/null || true
     done
     firewall-cmd --reload 2>/dev/null || true
     ok "Firewalld 防火墙规则已添加"
   else
     warn "未检测到 UFW 或 firewalld，请手动放行端口:"
-    warn "  - 443/tcp  (Xray)"
+    warn "  - ${XRAY_PORT}/tcp  (Xray)"
     warn "  - 80/tcp   (HTTP)"
     warn "  - ${NODE_BACKEND_PORT}/tcp (节点后端)"
   fi
@@ -651,7 +652,7 @@ save_node_info() {
   生成时间: $(date '+%Y-%m-%d %H:%M:%S')
 ============================================
   服务器地址:   ${ip}
-  端口:         443
+  端口:         ${XRAY_PORT}
   协议:         VLESS + XTLS-Vision + REALITY
   UUID:         ${UUID}
   PublicKey:    ${pub}
@@ -683,7 +684,7 @@ print_result() {
   echo "  │             节点连接信息                      │"
   echo "  ├─────────────────────────────────────────────┤"
   echo "  │  地址:        ${ip}"
-  echo "  │  端口:        443"
+  echo "  │  端口:        ${XRAY_PORT}"
   echo "  │  协议:        VLESS + XTLS-Vision + REALITY"
   echo "  │  UUID:        ${UUID}"
   echo "  │  PublicKey:   ${pub}"
@@ -724,6 +725,32 @@ do_install() {
   echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
   echo -e "${MAG}          虎啸VPN 节点 — 全新安装${RESET}"
   echo -e "${MAG}══════════════════════════════════════════════════════════${RESET}"
+
+  # 自定义安装参数
+  echo ""
+  echo -e "  ${CYAN}安装参数配置${NC}"
+  echo -e "  ${DIM}（直接按 Enter 使用默认值）${NC}"
+  echo ""
+
+  echo -n "  Xray 监听端口 [${XRAY_PORT}]: "
+  read -r input_port
+  if [[ -n "$input_port" ]]; then
+    if ! [[ "$input_port" =~ ^[0-9]+$ ]] || [[ "$input_port" -lt 1 || "$input_port" -gt 65535 ]]; then
+      error "无效端口号，使用默认值 443"
+      XRAY_PORT=443
+    else
+      XRAY_PORT=$input_port
+    fi
+  fi
+
+  echo -n "  REALITY 回落域名 [${FALLBACK_DOMAIN}]: "
+  read -r input_domain
+  if [[ -n "$input_domain" ]]; then
+    FALLBACK_DOMAIN=$input_domain
+  fi
+
+  info "端口: ${XRAY_PORT}, 回落域名: ${FALLBACK_DOMAIN}"
+  echo ""
 
   local ver
   ver=$(get_latest_xray_version)
@@ -857,12 +884,12 @@ do_uninstall() {
 
   title "清理防火墙规则"
   if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
-    ufw delete allow 443/tcp 2>/dev/null || true
+    ufw delete allow ${XRAY_PORT}/tcp 2>/dev/null || true
     ufw delete allow 80/tcp 2>/dev/null || true
     ufw delete allow "$NODE_BACKEND_PORT"/tcp 2>/dev/null || true
     ok "UFW 规则已清理"
   elif command -v firewall-cmd &>/dev/null; then
-    for p in 443 80 "$NODE_BACKEND_PORT"; do
+    for p in ${XRAY_PORT} 80 "$NODE_BACKEND_PORT"; do
       firewall-cmd --permanent --remove-port="$p"/tcp 2>/dev/null || true
     done
     firewall-cmd --reload 2>/dev/null || true
@@ -1026,7 +1053,7 @@ do_addnode() {
   echo "  │             节点连接信息                      │"
   echo "  ├─────────────────────────────────────────────┤"
   echo "  │  地址:        $ip"
-  echo "  │  端口:        443"
+  echo "  │  端口:        ${XRAY_PORT}"
   echo "  │  协议:        VLESS + XTLS-Vision + REALITY"
   echo "  │  UUID:        $uuid"
   echo "  │  PublicKey:   $pubkey"
